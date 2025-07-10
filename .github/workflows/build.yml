@@ -13,43 +13,739 @@ on:
 permissions:
   contents: write
 
+# 环境变量
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 jobs:
-  build-rust:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
+  # 安全检查作业
+  security:
+    name: 🔒 安全检查
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Install Rust
-        run: rustup toolchain install stable --component llvm-tools-preview
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: install nextest
-        uses: taiki-e/install-action@nextest
+
+      - name: 安装安全检查工具
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: 检测硬编码密钥和敏感信息
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Rust 依赖漏洞审计
+        run: cargo audit
+
+  # 工作流验证作业
+  workflow-validation:
+    name: 📊 工作流验证
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 验证 YAML 语法
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: .github/workflows/
+          config_data: |
+            extends: default
+            rules:
+              line-length:
+                max: 120
+
+  # 代码质量检查作业
+  checks:
+    name: 🦀 代码质量检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install stable --component rustfmt,clippy
+          rustup default stable
+
+      - name: 安装附加工具
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,typos-cli
+
       - uses: Swatinem/rust-cache@v2
-      - name: Check code format
+        with:
+          key: checks
+
+      - name: 检查代码格式
         run: cargo fmt -- --check
-      - name: Check the package for errors
-        run: cargo check --all
-      - name: Lint rust sources
-        run: cargo clippy --all-targets --all-features --tests --benches -- -D warnings
-      - name: Execute rust tests
-        run: cargo nextest run --all-features
-      - name: Generate a changelog
+
+      - name: 拼写检查
+        run: typos --format brief
+
+      - name: 安全和许可证检查
+        run: cargo deny check
+
+      - name: 检查代码错误
+        run: cargo check --all-targets --all-features
+
+      - name: Clippy 严格代码检查
+        run: |
+          cargo clippy --all-targets --all-features --tests --benches -- \
+          -D warnings \
+          -D clippy::all \
+          -D clippy::pedantic \
+          -D clippy::cognitive_complexity \
+          -D clippy::too_many_lines \
+          -A clippy::module_name_repetitions
+
+      - name: 文档生成检查
+        run: cargo doc --no-deps --document-private-items --all-features
+
+      - name: 文档测试
+        run: cargo test --doc --all-features
+
+  # 测试作业 - 支持多平台
+  test:
+    name: 🧪 测试 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    needs: [security, workflow-validation, checks]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install stable --component llvm-tools-preview
+          rustup default stable
+
+      - name: 安装测试工具
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.target }}
+
+      - name: 运行测试
+        run: cargo nextest run --all-features --profile ci
+
+      - name: 生成测试覆盖率报告 (仅限 Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cargo llvm-cov nextest --all-features --lcov --output-path lcov.info
+          cargo llvm-cov report --html --output-dir coverage-html
+
+      - name: 上传覆盖率报告到 Codecov (仅限 Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+
+      - name: 上传覆盖率 HTML 报告 (仅限 Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage-html
+
+  # 基准测试作业
+  benchmark:
+    name: 📈 基准测试
+    runs-on: ubuntu-latest
+    needs: checks
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: rustup toolchain install stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: benchmark
+
+      - name: 运行基准测试
+        run: cargo bench --bench '*' || echo "没有配置基准测试"
+
+  # 桌面平台构建作业
+  desktop-build:
+    name: 🖥️ 桌面平台构建 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux 平台
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            use-cross: false
+            platform: linux
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use-cross: true
+            platform: linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use-cross: true
+            platform: linux
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            use-cross: true
+            platform: linux
+          
+          # Windows 平台
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use-cross: false
+            platform: windows
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            use-cross: false
+            platform: windows
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            use-cross: true
+            platform: windows
+          
+          # macOS 平台
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            use-cross: false
+            platform: macos
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            use-cross: false
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+    needs: [security, workflow-validation, checks, test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install stable
+          rustup target add ${{ matrix.target }}
+          rustup default stable
+
+      - name: 安装交叉编译工具
+        if: matrix.use-cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: 安装 Windows 额外工具链
+        if: matrix.platform == 'windows' && matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu
+          rustup target add x86_64-pc-windows-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-${{ matrix.target }}
+
+      - name: 构建项目 (交叉编译)
+        if: matrix.use-cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: 构建项目 (本地编译)
+        if: '!matrix.use-cross'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: 创建发布包
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+            7z a ../../../${{ github.event.repository.name }}-${{ matrix.target }}.zip ${{ github.event.repository.name }}.exe
+          else
+            tar czvf ../../../${{ github.event.repository.name }}-${{ matrix.target }}.tar.gz ${{ github.event.repository.name }}
+          fi
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v3
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            ${{ github.event.repository.name }}-${{ matrix.target }}.*
+
+  # 移动平台构建作业
+  mobile-build:
+    name: 📱 移动平台构建 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # iOS 平台
+          - os: macos-latest
+            target: aarch64-apple-ios
+            platform: ios
+            sdk: iphoneos
+          - os: macos-latest
+            target: x86_64-apple-ios
+            platform: ios
+            sdk: iphonesimulator
+          - os: macos-latest
+            target: aarch64-apple-ios-sim
+            platform: ios
+            sdk: iphonesimulator
+          
+          # Android 平台
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            platform: android
+            arch: arm64-v8a
+          - os: ubuntu-latest
+            target: armv7-linux-androideabi
+            platform: android
+            arch: armeabi-v7a
+          - os: ubuntu-latest
+            target: x86_64-linux-android
+            platform: android
+            arch: x86_64
+          - os: ubuntu-latest
+            target: i686-linux-android
+            platform: android
+            arch: x86
+
+    runs-on: ${{ matrix.os }}
+    needs: [security, workflow-validation, checks]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install stable
+          rustup target add ${{ matrix.target }}
+          rustup default stable
+
+      # iOS 特定设置
+      - name: 设置 iOS 开发环境
+        if: matrix.platform == 'ios'
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcrun --sdk ${{ matrix.sdk }} --show-sdk-path
+
+      # Android 特定设置
+      - name: 设置 Android 开发环境
+        if: matrix.platform == 'android'
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
+          
+      - name: 安装 Android NDK 工具链
+        if: matrix.platform == 'android'
+        run: |
+          rustup toolchain install stable
+          # 设置 NDK 链接器
+          cat >> ~/.cargo/config.toml << EOF
+          [target.aarch64-linux-android]
+          linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          
+          [target.armv7-linux-androideabi]
+          linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang"
+          
+          [target.x86_64-linux-android]
+          linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang"
+          
+          [target.i686-linux-android]
+          linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android21-clang"
+          EOF
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: mobile-${{ matrix.target }}
+
+      - name: 构建移动平台项目
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: 创建移动平台发布包
+        shell: bash
+        run: |
+          mkdir -p mobile-releases/${{ matrix.platform }}
+          cd target/${{ matrix.target }}/release
+          if [[ "${{ matrix.platform }}" == "ios" ]]; then
+            # iOS 静态库
+            cp lib${{ github.event.repository.name }}.a ../../../mobile-releases/${{ matrix.platform }}/lib${{ github.event.repository.name }}-${{ matrix.target }}.a
+          elif [[ "${{ matrix.platform }}" == "android" ]]; then
+            # Android 共享库
+            cp lib${{ github.event.repository.name }}.so ../../../mobile-releases/${{ matrix.platform }}/lib${{ github.event.repository.name }}-${{ matrix.arch }}.so
+          fi
+
+      - name: 上传移动平台构建产物
+        uses: actions/upload-artifact@v3
+        with:
+          name: mobile-${{ matrix.platform }}-${{ matrix.target }}
+          path: mobile-releases/
+
+  # Web 平台构建作业
+  web-build:
+    name: 🌐 Web 平台构建 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: wasm32-unknown-unknown
+            optimize: true
+            bindgen: true
+          - target: wasm32-wasi
+            optimize: true
+            bindgen: false
+
+    runs-on: ubuntu-latest
+    needs: [security, workflow-validation, checks]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链和 WASM 工具
+        run: |
+          rustup toolchain install stable
+          rustup target add ${{ matrix.target }}
+          rustup default stable
+
+      - name: 安装 WASM 工具链
+        run: |
+          cargo install wasm-pack
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          
+      - name: 安装 wasmtime (for WASI)
+        if: matrix.target == 'wasm32-wasi'
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: web-${{ matrix.target }}
+
+      - name: 构建 WASM (wasm-pack)
+        if: matrix.bindgen
+        run: |
+          wasm-pack build --target web --out-dir pkg-web --release
+          wasm-pack build --target nodejs --out-dir pkg-node --release
+          wasm-pack build --target bundler --out-dir pkg-bundler --release
+
+      - name: 构建 WASM (cargo)
+        if: '!matrix.bindgen'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: 优化 WASM
+        if: matrix.optimize
+        run: |
+          cargo install wasm-opt
+          if [[ "${{ matrix.bindgen }}" == "true" ]]; then
+            wasm-opt -Oz pkg-web/${{ github.event.repository.name }}_bg.wasm -o pkg-web/${{ github.event.repository.name }}_bg.wasm
+            wasm-opt -Oz pkg-node/${{ github.event.repository.name }}_bg.wasm -o pkg-node/${{ github.event.repository.name }}_bg.wasm
+            wasm-opt -Oz pkg-bundler/${{ github.event.repository.name }}_bg.wasm -o pkg-bundler/${{ github.event.repository.name }}_bg.wasm
+          else
+            wasm-opt -Oz target/${{ matrix.target }}/release/${{ github.event.repository.name }}.wasm -o target/${{ matrix.target }}/release/${{ github.event.repository.name }}.wasm
+          fi
+
+      - name: 创建 Web 发布包
+        shell: bash
+        run: |
+          mkdir -p web-releases
+          if [[ "${{ matrix.bindgen }}" == "true" ]]; then
+            tar czvf web-releases/${{ github.event.repository.name }}-web.tar.gz pkg-web/
+            tar czvf web-releases/${{ github.event.repository.name }}-node.tar.gz pkg-node/
+            tar czvf web-releases/${{ github.event.repository.name }}-bundler.tar.gz pkg-bundler/
+          else
+            cd target/${{ matrix.target }}/release
+            tar czvf ../../../web-releases/${{ github.event.repository.name }}-${{ matrix.target }}.tar.gz ${{ github.event.repository.name }}.wasm
+          fi
+
+      - name: 上传 Web 构建产物
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-${{ matrix.target }}
+          path: web-releases/
+
+  # 特殊平台构建作业 (HarmonyOS 等)
+  special-build:
+    name: 🔮 特殊平台构建 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # HarmonyOS (实验性支持)
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-ohos
+            platform: harmonyos
+            experimental: true
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-ohos
+            platform: harmonyos
+            experimental: true
+
+    runs-on: ${{ matrix.os }}
+    needs: [security, workflow-validation, checks]
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install nightly
+          rustup override set nightly
+          
+      - name: 尝试添加目标平台
+        continue-on-error: true
+        run: rustup target add ${{ matrix.target }}
+
+      - name: 设置 HarmonyOS 开发环境
+        if: matrix.platform == 'harmonyos'
+        run: |
+          echo "HarmonyOS 支持仍在实验阶段"
+          echo "当前使用 Linux 工具链进行交叉编译"
+          # 这里可以添加 HarmonyOS SDK 的安装和配置
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: special-${{ matrix.target }}
+
+      - name: 构建特殊平台项目
+        continue-on-error: ${{ matrix.experimental }}
+        run: |
+          if rustup target list --installed | grep -q ${{ matrix.target }}; then
+            cargo build --release --target ${{ matrix.target }}
+          else
+            echo "目标平台 ${{ matrix.target }} 暂不可用，跳过构建"
+          fi
+
+      - name: 上传特殊平台构建产物
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: special-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/
+
+  # 构建作业 - 保持向后兼容
+  build:
+    name: 🔗 兼容性构建
+    needs: [desktop-build, mobile-build, web-build, special-build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: 构建状态汇总
+        run: |
+          echo "## 🏗️ 跨平台构建完成状态" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 构建结果" >> $GITHUB_STEP_SUMMARY
+          echo "- 🖥️ **桌面平台**: ${{ needs.desktop-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 **移动平台**: ${{ needs.mobile-build.result }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- 🌐 **Web 平台**: ${{ needs.web-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔮 **特殊平台**: ${{ needs.special-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 支持的平台" >> $GITHUB_STEP_SUMMARY
+          echo "**桌面端:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Linux (x86_64, aarch64, musl, i686)" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows (x86_64, i686, gnu)" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS (x86_64, Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**移动端:**" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS (设备和模拟器)" >> $GITHUB_STEP_SUMMARY
+          echo "- Android (ARM64, ARMv7, x86_64, x86)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Web 端:**" >> $GITHUB_STEP_SUMMARY
+          echo "- WebAssembly (浏览器和 Node.js)" >> $GITHUB_STEP_SUMMARY
+          echo "- WASI (服务器端 WASM)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**特殊平台:**" >> $GITHUB_STEP_SUMMARY
+          echo "- HarmonyOS (实验性支持)" >> $GITHUB_STEP_SUMMARY
+
+  # 代码质量分析
+  quality-analysis:
+    name: 📊 代码质量分析
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装分析工具
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
+
+      - name: 检查未使用的依赖
+        run: cargo machete
+
+      - name: 生成依赖图
+        run: |
+          cargo tree --format "{p} {f}" > dependency-tree.txt
+          echo "依赖树已生成"
+
+      - name: 上传依赖分析结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-analysis
+          path: dependency-tree.txt
+
+  # 依赖更新检查
+  dependency-review:
+    name: 🔍 依赖安全检查
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: always
+
+  # 发布作业
+  release:
+    name: 🚀 创建发布
+    runs-on: ubuntu-latest
+    needs: [security, workflow-validation, checks, test, desktop-build, mobile-build, web-build, special-build, quality-analysis]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v3
+
+      - name: 组织发布文件结构
+        run: |
+          mkdir -p releases/{desktop,mobile,web,special}
+          
+          # 整理桌面平台文件
+          find . -name "desktop-*" -type d | while read dir; do
+            if [ -d "$dir" ]; then
+              cp -r "$dir"/* releases/desktop/ 2>/dev/null || true
+            fi
+          done
+          
+          # 整理移动平台文件
+          find . -name "mobile-*" -type d | while read dir; do
+            if [ -d "$dir" ]; then
+              cp -r "$dir"/* releases/mobile/ 2>/dev/null || true
+            fi
+          done
+          
+          # 整理 Web 平台文件
+          find . -name "web-*" -type d | while read dir; do
+            if [ -d "$dir" ]; then
+              cp -r "$dir"/* releases/web/ 2>/dev/null || true
+            fi
+          done
+          
+          # 整理特殊平台文件
+          find . -name "special-*" -type d | while read dir; do
+            if [ -d "$dir" ]; then
+              cp -r "$dir"/* releases/special/ 2>/dev/null || true
+            fi
+          done
+
+      - name: 生成变更日志
         uses: orhun/git-cliff-action@v2
         id: git-cliff
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           config: cliff.toml
           args: -vv --latest --strip header
         env:
           OUTPUT: CHANGES.md
-      - name: Release
+
+      - name: 生成发布说明
+        run: |
+          cat > RELEASE_NOTES.md << 'EOF'
+          ## 🚀 跨平台发布
+          
+          本版本支持以下平台：
+          
+          ### 🖥️ 桌面平台
+          - **Linux**: x86_64, aarch64, musl, i686
+          - **Windows**: x86_64, i686, GNU 工具链
+          - **macOS**: Intel 和 Apple Silicon
+          
+          ### 📱 移动平台
+          - **iOS**: 设备 (aarch64) 和模拟器 (x86_64, aarch64)
+          - **Android**: ARM64, ARMv7, x86_64, x86
+          
+          ### 🌐 Web 平台
+          - **WebAssembly**: 浏览器、Node.js、打包工具支持
+          - **WASI**: 服务器端 WebAssembly
+          
+          ### 🔮 实验性平台
+          - **HarmonyOS**: 实验性支持 (aarch64, x86_64)
+          
+          ---
+          
+          EOF
+          cat CHANGES.md >> RELEASE_NOTES.md
+
+      - name: 创建平台特定的压缩包
+        run: |
+          cd releases
+          
+          # 创建桌面平台压缩包
+          if [ -d "desktop" ] && [ "$(ls -A desktop)" ]; then
+            tar czvf ../desktop-all-platforms.tar.gz desktop/
+          fi
+          
+          # 创建移动平台压缩包
+          if [ -d "mobile" ] && [ "$(ls -A mobile)" ]; then
+            tar czvf ../mobile-all-platforms.tar.gz mobile/
+          fi
+          
+          # 创建 Web 平台压缩包
+          if [ -d "web" ] && [ "$(ls -A web)" ]; then
+            tar czvf ../web-all-platforms.tar.gz web/
+          fi
+          
+          # 创建特殊平台压缩包
+          if [ -d "special" ] && [ "$(ls -A special)" ]; then
+            tar czvf ../special-platforms.tar.gz special/
+          fi
+
+      - name: 创建发布
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          body: ${{ steps.git-cliff.outputs.content }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            desktop-all-platforms.tar.gz
+            mobile-all-platforms.tar.gz
+            web-all-platforms.tar.gz
+            special-platforms.tar.gz
+            desktop-*/*
+            mobile-*/*
+            web-*/*
+            special-*/*
+          draft: false
+          prerelease: false
+          name: "Release ${{ github.ref_name }} - 全平台支持"

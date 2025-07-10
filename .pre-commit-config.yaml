@@ -1,61 +1,534 @@
+# =============================================================================
+# 🚀 Pre-commit Configuration - Multi-Language Project (严格版本)
+# =============================================================================
+# 更严格、更规范、更新版本的预提交钩子配置
+# 适用于 Rust + Python 多语言项目的全面代码质量控制
+
 fail_fast: false
+exclude: |
+  (?x)^(
+      .*\.lock$|          # 排除锁文件
+      target/.*|          # 排除构建目录
+      \.git/.*|           # 排除 git 目录
+      .*\.bak$|           # 排除备份文件
+      .*\.tmp$            # 排除临时文件
+  )$
+
+default_language_version:
+  python: python3.12
+  node: "20.11.1"
+  rust: "1.75.0"
+
 repos:
+  # ==========================================================================
+  #                           🔒 安全检查工具
+  # ==========================================================================
+  
+  # 检测硬编码密钥和敏感信息
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.22.1
+    hooks:
+      - id: gitleaks
+        name: "🔒 安全 · 检测硬编码密钥"
+        args: ['--verbose', '--redact']
+
+  # 检测私钥文件
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: "🔒 安全 · 检测密钥和敏感信息"
+        args: ['--baseline', '.secrets.baseline']
+        exclude: \.secrets\.baseline$
+
+  # ==========================================================================
+  #                          📁 文件系统和通用检查
+  # ==========================================================================
+  
+  # 预提交官方钩子集合 - 最新版本
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v5.0.0
     hooks:
-      - id: check-byte-order-marker
-      - id: check-case-conflict
-      - id: check-merge-conflict
-      - id: check-symlinks
+      # 文件格式检查
+      - id: check-toml
+        name: "📁 格式 · 验证 TOML 文件语法"
       - id: check-yaml
+        name: "📁 格式 · 验证 YAML 文件语法"
+        args: ['--allow-multiple-documents']
+      - id: check-json
+        name: "📁 格式 · 验证 JSON 文件语法"
+      - id: check-xml
+        name: "📁 格式 · 验证 XML 文件语法"
+      
+      # 文件系统检查
+      - id: check-case-conflict
+        name: "📁 系统 · 检查文件名大小写冲突"
+      - id: check-symlinks
+        name: "📁 系统 · 检查符号链接有效性"
+      - id: destroyed-symlinks
+        name: "📁 系统 · 检测损坏的符号链接"
+      - id: check-executables-have-shebangs
+        name: "📁 系统 · 检查可执行文件的 shebang"
+      - id: check-shebang-scripts-are-executable
+        name: "📁 系统 · 检查脚本的可执行权限"
+      - id: check-illegal-windows-names
+        name: "📁 系统 · 检查非法的 Windows 文件名"
+      
+      # Git 检查
+      - id: check-merge-conflict
+        name: "🌳 Git · 检测合并冲突标记"
+      - id: check-added-large-files
+        name: "🌳 Git · 阻止提交大文件"
+        args: ['--maxkb=2048']  # 更严格的 2MB 限制
+      - id: forbid-new-submodules
+        name: "🌳 Git · 禁止新增子模块"
+      - id: no-commit-to-branch
+        name: "🌳 Git · 保护主分支"
+        args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
+      
+      # 文件内容清理
       - id: end-of-file-fixer
-      - id: mixed-line-ending
+        name: "✨ 清理 · 确保文件以换行符结尾"
       - id: trailing-whitespace
-  - repo: https://github.com/psf/black
-    rev: 22.10.0
-    hooks:
-      - id: black
+        name: "✨ 清理 · 删除行尾空白字符"
+        args: ['--markdown-linebreak-ext=md']
+      - id: mixed-line-ending
+        name: "✨ 清理 · 统一行结束符"
+        args: ['--fix=lf']
+      - id: fix-byte-order-marker
+        name: "✨ 清理 · 移除字节顺序标记"
+
+  # ==========================================================================
+  #                            🦀 Rust 专用工具
+  # ==========================================================================
+  
+  # Rust 代码格式化和检查
   - repo: local
     hooks:
+      # 代码格式化检查
       - id: cargo-fmt
-        name: cargo fmt
-        description: Format files with rustfmt.
-        entry: bash -c 'cargo fmt -- --check'
-        language: rust
+        name: "🦀 Rust · 代码格式化检查"
+        description: "使用 rustfmt 检查代码格式"
+        entry: bash -c 'cargo fmt --all -- --check'
+        language: system
         files: \.rs$
-        args: []
-      - id: cargo-deny
-        name: cargo deny check
-        description: Check cargo dependencies
-        entry: bash -c 'cargo deny check -d'
-        language: rust
-        files: \.rs$
-        args: []
-      - id: typos
-        name: typos
-        description: check typo
-        entry: bash -c 'typos'
-        language: rust
-        files: \.*$
         pass_filenames: false
+        
+      # 自动修复代码格式
+      - id: cargo-fmt-fix
+        name: "🦀 Rust · 自动格式化修复"
+        description: "使用 rustfmt 自动修复代码格式"
+        entry: bash -c 'cargo fmt --all'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        
+      # 编译检查
       - id: cargo-check
-        name: cargo check
-        description: Check the package for errors.
-        entry: bash -c 'cargo check --all'
-        language: rust
+        name: "🦀 Rust · 编译检查"
+        description: "检查代码是否能正常编译"
+        entry: bash -c 'cargo check --all-targets --all-features'
+        language: system
         files: \.rs$
         pass_filenames: false
+        
+      # Clippy 代码质量检查
       - id: cargo-clippy
-        name: cargo clippy
-        description: Lint rust sources
-        entry: bash -c 'cargo clippy --all-targets --all-features --tests --benches -- -D warnings'
-        language: rust
+        name: "🦀 Rust · Clippy 代码质量检查"
+        description: "使用 Clippy 进行代码质量分析"
+        entry: bash -c 'cargo clippy --all-targets --all-features -- -D warnings -D clippy::all -D clippy::pedantic -A clippy::module_name_repetitions'
+        language: system
         files: \.rs$
         pass_filenames: false
+        
+      # 依赖安全检查
+      - id: cargo-deny
+        name: "🦀 Rust · 依赖安全检查"
+        description: "检查依赖的安全性和许可证"
+        entry: bash -c 'cargo deny check'
+        language: system
+        files: \.rs$|Cargo\.toml$|Cargo\.lock$
+        pass_filenames: false
+        
+      # 审计依赖漏洞
+      - id: cargo-audit
+        name: "🦀 Rust · 依赖漏洞审计"
+        description: "检查依赖中的已知安全漏洞"
+        entry: bash -c 'cargo audit'
+        language: system
+        files: \.rs$|Cargo\.toml$|Cargo\.lock$
+        pass_filenames: false
+        
+      # 单元测试
       - id: cargo-test
-        name: cargo test
-        description: unit test for the project
+        name: "🦀 Rust · 运行单元测试"
+        description: "运行项目的单元测试"
         entry: bash -c 'cargo nextest run --all-features'
-        language: rust
+        language: system
         files: \.rs$
         pass_filenames: false
+        
+      # 文档测试
+      - id: cargo-doc-test
+        name: "🦀 Rust · 文档测试"
+        description: "运行文档中的测试"
+        entry: bash -c 'cargo test --doc'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        
+      # 文档生成检查
+      - id: cargo-doc
+        name: "🦀 Rust · 文档生成检查"
+        description: "检查文档是否能正常生成"
+        entry: bash -c 'cargo doc --no-deps --document-private-items'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+  # ==========================================================================
+  #                            🐍 Python 专用工具
+  # ==========================================================================
+  
+  # Ruff - 现代 Python 代码格式化和静态检查工具
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.1
+    hooks:
+      # Python 代码格式化
+      - id: ruff-format
+        name: "🐍 Python · 代码格式化"
+        description: "使用 Ruff 格式化 Python 代码"
+      
+      # Python 代码检查和自动修复
+      - id: ruff
+        name: "🐍 Python · 代码检查和修复"
+        description: "使用 Ruff 进行代码质量检查和自动修复"
+        args: ['--fix', '--exit-non-zero-on-fix']
+
+  # Python 静态类型检查
+  - repo: https://github.com/python/mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        name: "🐍 Python · 静态类型检查"
+        description: "使用 MyPy 进行静态类型检查"
+        additional_dependencies: [types-all]
+        args: ['--strict', '--show-error-codes']
+
+  # Python 导入排序
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: "🐍 Python · 导入排序"
+        description: "使用 isort 排序和格式化导入语句"
+        args: ['--profile', 'black', '--line-length', '88']
+
+  # Python 安全检查
+  - repo: https://github.com/pycqa/bandit
+    rev: '1.7.10'
+    hooks:
+      - id: bandit
+        name: "🐍 Python · 安全漏洞检查"
+        description: "使用 Bandit 检查常见安全问题"
+        args: ['-r', '-f', 'json']
+        exclude: tests/.*
+
+  # Python 代码复杂度检查
+  - repo: https://github.com/xeniter/pre-commit-xeniter
+    rev: v0.1.0
+    hooks:
+      - id: radon-cc
+        name: "🐍 Python · 代码复杂度检查"
+        description: "使用 Radon 检查代码复杂度"
+        args: ['--min', 'B']
+
+  # Python 文档字符串检查
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: "🐍 Python · 文档字符串检查"
+        description: "检查 Python 文档字符串规范"
+        args: ['--convention=google']
+
+  # Python 死代码检测
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: 'v2.13'
+    hooks:
+      - id: vulture
+        name: "🐍 Python · 死代码检测"
+        description: "使用 Vulture 检测未使用的代码"
+        args: ['--min-confidence', '80']
+
+  # Python 项目依赖检查
+  - repo: https://github.com/PyCQA/safety
+    rev: '3.2.11'
+    hooks:
+      - id: safety
+        name: "🐍 Python · 依赖安全检查"
+        description: "使用 Safety 检查依赖包的安全漏洞"
+        args: ['--json']
+
+  # Python 本地工具
+  - repo: local
+    hooks:
+      # Python 语法检查
+      - id: python-check-ast
+        name: "🐍 Python · AST 语法检查"
+        description: "检查 Python 文件的 AST 语法"
+        entry: python -m py_compile
+        language: system
+        files: \.py$
+        
+      # Python 测试覆盖率检查
+      - id: pytest-cov
+        name: "🐍 Python · 测试覆盖率检查"
+        description: "运行 pytest 并检查测试覆盖率"
+        entry: bash -c 'python -m pytest --cov=. --cov-report=term-missing --cov-fail-under=80'
+        language: system
+        files: \.py$
+        pass_filenames: false
+        
+      # Python 快速测试
+      - id: pytest-fast
+        name: "🐍 Python · 快速测试"
+        description: "运行快速的 Python 测试"
+        entry: bash -c 'python -m pytest -x --ff -q'
+        language: system
+        files: \.py$
+        pass_filenames: false
+        
+      # Python 依赖检查
+      - id: pip-check
+        name: "🐍 Python · 依赖一致性检查"
+        description: "检查 pip 依赖的一致性"
+        entry: bash -c 'python -m pip check'
+        language: system
+        files: requirements.*\.txt$|pyproject\.toml$|setup\.py$
+        pass_filenames: false
+        
+      # Python 包导入检查
+      - id: python-import-check
+        name: "🐍 Python · 导入检查"
+        description: "检查 Python 包是否可以正常导入"
+        entry: bash -c 'python -c "import sys; [__import__(m) for m in sys.argv[1:]]"'
+        language: system
+        files: \.py$
+        pass_filenames: false
+
+  # Python 额外质量工具
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.0
+    hooks:
+      - id: pyupgrade
+        name: "🐍 Python · 语法现代化"
+        description: "自动升级到现代 Python 语法"
+        args: ['--py38-plus']
+
+  # Python 模块导入检查
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v3.1.0
+    hooks:
+      - id: add-trailing-comma
+        name: "🐍 Python · 添加尾随逗号"
+        description: "自动添加尾随逗号以改善 diff"
+
+  # Python 文档生成检查
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        name: "🐍 Python · 文档覆盖率检查"
+        description: "检查 Python 代码的文档覆盖率"
+        args: ['--fail-under=80', '--verbose']
+
+  # Jupyter Notebook 支持
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.9.1
+    hooks:
+      # Notebook 代码格式化
+      - id: nbqa-ruff
+        name: "🐍 Jupyter · Ruff 格式化"
+        description: "使用 Ruff 格式化 Jupyter Notebook"
+        additional_dependencies: [ruff]
+      
+      # Notebook 类型检查
+      - id: nbqa-mypy
+        name: "🐍 Jupyter · MyPy 类型检查"
+        description: "对 Jupyter Notebook 进行类型检查"
+        additional_dependencies: [mypy]
+      
+      # Notebook 导入排序
+      - id: nbqa-isort
+        name: "🐍 Jupyter · 导入排序"
+        description: "排序 Jupyter Notebook 中的导入"
+        additional_dependencies: [isort]
+
+  # Jupyter Notebook 清理
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        name: "🐍 Jupyter · 清理输出"
+        description: "清理 Notebook 输出和元数据"
+
+  # ==========================================================================
+  #                           🔍 拼写和文档检查
+  # ==========================================================================
+  
+  # 拼写检查
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.16.26
+    hooks:
+      - id: typos
+        name: "🔍 拼写 · 检查代码和文档中的拼写错误"
+        args: ['--format=brief']
+
+  # Markdown 格式化
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        name: "📝 Markdown · 格式化"
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-tables
+          - mdformat-toc
+        args: ['--wrap=80']
+
+  # Markdown 语法检查
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        name: "📝 Markdown · 语法检查"
+        args: ['--fix']
+
+  # ==========================================================================
+  #                           📊 配置文件验证
+  # ==========================================================================
+  
+  # JSON Schema 验证
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.31.0
+    hooks:
+      - id: check-github-workflows
+        name: "🐙 GitHub · 验证工作流文件"
+        args: ['--verbose']
+      - id: check-jsonschema
+        name: "📊 配置 · 验证 JSON Schema"
+        files: \.json$
+
+  # YAML 语法检查
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: "📊 YAML · 语法检查"
+        args: ['-d', '{extends: default, rules: {line-length: {max: 120}}}']
+
+  # ==========================================================================
+  #                           🔧 Shell 脚本检查
+  # ==========================================================================
+  
+  # Shell 脚本静态分析
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        name: "🐚 Shell · 脚本静态分析"
+
+  # Shell 脚本格式化
+  - repo: https://github.com/mvdan/sh
+    rev: v3.8.0
+    hooks:
+      - id: shfmt
+        name: "🐚 Shell · 脚本格式化"
+        args: ['-w', '-s', '-i', '2']
+
+  # ==========================================================================
+  #                           📝 提交信息检查
+  # ==========================================================================
+  
+  # 提交信息格式检查
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.2.0
+    hooks:
+      - id: conventional-pre-commit
+        name: "📝 提交 · 验证提交信息格式"
+        stages: [commit-msg]
+        args: ['--strict']
+
+  # ==========================================================================
+  #                           🎨 代码美化工具
+  # ==========================================================================
+  
+  # Prettier 格式化（仅用于 Web 相关文件）
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        name: "🎨 格式化 · Web 文件"
+        types_or: [css, scss, javascript, ts, html]
+        exclude: \.(min\.|bundle\.)
+
+  # ==========================================================================
+  #                           🧪 额外质量检查
+  # ==========================================================================
+  
+  # 代码复杂度检查
+  - repo: local
+    hooks:
+      - id: cargo-complexity
+        name: "🧪 质量 · 代码复杂度检查"
+        description: "检查代码的复杂度"
+        entry: bash -c 'cargo clippy -- -W clippy::cognitive_complexity -W clippy::too_many_lines'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+  # 许可证头检查
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: insert-license
+        name: "📜 许可证 · 插入许可证头"
+        files: \.rs$
+        args:
+          - --license-filepath
+          - LICENSE-HEADER.txt
+          - --comment-style
+          - //
+
+# =============================================================================
+# 配置说明：
+# 
+# 此配置文件包含了针对多语言项目（Rust + Python）的全面质量检查：
+# 
+# 🔒 安全性：密钥检测、依赖审计、漏洞扫描
+# 📁 文件系统：格式验证、权限检查、文件清理
+# 🦀 Rust 专用：格式化、编译、测试、文档、依赖检查
+# 🐍 Python 专用：格式化、类型检查、测试、安全检查、文档验证、Jupyter 支持
+# 🔍 文档质量：拼写检查、Markdown 格式化和验证
+# 📊 配置验证：JSON/YAML Schema 验证
+# 🐚 脚本检查：Shell 静态分析和格式化
+# 📝 提交规范：标准化提交信息格式
+# 🎨 代码美化：统一代码风格和格式
+# 🧪 质量保证：复杂度分析、死代码检测、许可证管理
+# 
+# 使用方法：
+# 1. pre-commit install --install-hooks
+# 2. pre-commit run --all-files
+# 3. git commit（自动运行检查）
+# 
+# Python 项目额外要求：
+# - pip install pytest pytest-cov mypy bandit safety vulture interrogate nbqa nbstripout
+# - 创建 pyproject.toml 或 setup.cfg 配置文件
+# - 可选：创建 .mypy.ini 配置 MyPy 类型检查规则
+# - Jupyter 用户：pip install jupyter nbconvert
+# 
+# Rust 项目额外要求：
+# - cargo install cargo-audit cargo-nextest
+# - 配置 deny.toml 和 _typos.toml 文件
+# =============================================================================

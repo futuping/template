@@ -1,0 +1,110 @@
+# =============================================================================
+# 🔍 CodeQL 安全分析工作流
+# =============================================================================
+# GitHub CodeQL 静态代码分析，专门用于安全漏洞检测
+# 独立于主构建流程，确保安全检查的完整性和专业性
+
+name: "CodeQL 安全分析"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # 每周日 UTC 02:00 运行定期安全扫描
+    - cron: '0 2 * * 0'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+# 环境变量
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # CodeQL 分析作业
+  analyze:
+    name: 🔍 CodeQL 安全分析
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'rust' ]
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: 初始化 CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+          
+      - name: 安装 Rust 工具链
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - name: 设置 Rust 缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: codeql-analysis
+
+      # 自动构建尝试，如果失败则使用手动构建
+      - name: 自动构建
+        uses: github/codeql-action/autobuild@v2
+        continue-on-error: true
+        id: autobuild
+
+      # 如果自动构建失败，执行手动构建
+      - name: 手动构建 (fallback)
+        if: steps.autobuild.outcome == 'failure'
+        run: |
+          echo "自动构建失败，执行手动构建..."
+          cargo clean
+          cargo build --all-targets --all-features --verbose
+
+      - name: 执行 CodeQL 分析
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"
+          upload: true
+
+  # 分析结果处理
+  results:
+    name: 📊 分析结果处理
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 生成安全报告摘要
+        run: |
+          echo "## 🔍 CodeQL 安全分析完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 分析详情" >> $GITHUB_STEP_SUMMARY
+          echo "- **语言**: Rust" >> $GITHUB_STEP_SUMMARY
+          echo "- **分析时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **触发事件**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 查看结果" >> $GITHUB_STEP_SUMMARY
+          echo "请前往 [Security](https://github.com/${{ github.repository }}/security/code-scanning) 页面查看详细的安全分析结果。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.analyze.result }}" == "success" ]; then
+            echo "✅ **状态**: 分析成功完成" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **状态**: 分析过程中出现问题" >> $GITHUB_STEP_SUMMARY
+          fi 
