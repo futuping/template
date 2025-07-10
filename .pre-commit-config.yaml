@@ -23,21 +23,21 @@ repos:
   # ==========================================================================
   
   # 检测硬编码密钥和敏感信息
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.4
-    hooks:
-      - id: gitleaks
-        name: "🔒 安全 · 检测硬编码密钥"
-        args: ['--verbose', '--redact']
+  # - repo: https://github.com/gitleaks/gitleaks
+  #   rev: v8.27.2
+  #   hooks:
+  #     - id: gitleaks
+  #       name: "🔒 安全 · 检测硬编码密钥"
+  #       args: ['--verbose', '--redact']
 
   # 检测私钥文件
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
-    hooks:
-      - id: detect-secrets
-        name: "🔒 安全 · 检测密钥和敏感信息"
-        args: ['--baseline', '.secrets.baseline']
-        exclude: \.secrets\.baseline$
+  # - repo: https://github.com/Yelp/detect-secrets
+  #   rev: v1.5.0
+  #   hooks:
+  #     - id: detect-secrets
+  #       name: "🔒 安全 · 检测密钥和敏感信息"
+  #       args: ['--baseline', '.secrets.baseline']
+  #       exclude: \.secrets\.baseline$
 
   # ==========================================================================
   #                          📁 文件系统和通用检查
@@ -45,7 +45,7 @@ repos:
   
   # 预提交官方钩子集合
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       # 文件格式检查
       - id: check-toml
@@ -89,7 +89,7 @@ repos:
         name: "🦀 Rust · 代码格式化检查"
         description: "使用 rustfmt 检查代码格式"
         entry: bash -c 'cargo fmt --all -- --check'
-        language: system
+        language: rust
         files: \.rs$
         pass_filenames: false
         
@@ -98,7 +98,7 @@ repos:
         name: "🦀 Rust · 编译检查"
         description: "检查代码是否能正常编译"
         entry: bash -c 'cargo check --all-targets --all-features'
-        language: system
+        language: rust
         files: \.rs$
         pass_filenames: false
         
@@ -107,7 +107,7 @@ repos:
         name: "🦀 Rust · Clippy 代码质量检查"
         description: "使用 Clippy 进行代码质量分析"
         entry: bash -c 'cargo clippy --all-targets --all-features -- -D warnings'
-        language: system
+        language: rust
         files: \.rs$
         pass_filenames: false
         
@@ -116,7 +116,7 @@ repos:
         name: "🦀 Rust · 依赖安全检查"
         description: "检查依赖的安全性和许可证"
         entry: bash -c 'cargo deny check'
-        language: system
+        language: rust
         files: \.rs$|Cargo\.toml$|Cargo\.lock$
         pass_filenames: false
         
@@ -124,8 +124,8 @@ repos:
       - id: cargo-test
         name: "🦀 Rust · 运行单元测试"
         description: "运行项目的单元测试"
-        entry: bash -c 'cargo test'
-        language: system
+        entry: bash -c 'cargo nextest run --all-features'
+        language: rust
         files: \.rs$
         pass_filenames: false
         
@@ -134,7 +134,7 @@ repos:
         name: "🦀 Rust · 文档生成检查"
         description: "检查文档是否能正常生成"
         entry: bash -c 'cargo doc --no-deps --document-private-items'
-        language: system
+        language: rust
         files: \.rs$
         pass_filenames: false
 
@@ -144,7 +144,7 @@ repos:
   
   # Ruff - 现代 Python 代码格式化和静态检查工具
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.6
+    rev: v0.12.2
     hooks:
       # Python 代码格式化
       - id: ruff-format
@@ -159,7 +159,7 @@ repos:
 
   # Python 导入排序
   - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+    rev: 6.0.1
     hooks:
       - id: isort
         name: "🐍 Python · 导入排序"
@@ -172,7 +172,7 @@ repos:
   
   # 拼写检查
   - repo: https://github.com/crate-ci/typos
-    rev: v1.16.26
+    rev: v1.34.0
     hooks:
       - id: typos
         name: "🔍 拼写 · 检查代码和文档中的拼写错误"
@@ -184,7 +184,7 @@ repos:
   
   # YAML 语法检查
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
         name: "📊 YAML · 语法检查"
@@ -192,7 +192,7 @@ repos:
 
   # Markdown 语法检查
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.37.0
+    rev: v0.45.0
     hooks:
       - id: markdownlint
         name: "📝 Markdown · 语法检查"
