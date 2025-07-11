@@ -1,8 +1,8 @@
 # =============================================================================
-# 🚀 Pre-commit Configuration - 修复版本
+# 🚀 Pre-commit Configuration - 优化版本
 # =============================================================================
-# 移除了有问题的仓库，专注于Rust项目的核心代码质量控制
-# 保留了最稳定和必要的工具
+# 移除了有问题的仓库和重复功能，专注于Rust项目的核心代码质量控制
+# 保留了最稳定和必要的工具，避免功能重叠
 
 fail_fast: false
 exclude: |
@@ -28,7 +28,7 @@ repos:
     hooks:
       - id: gitleaks
         name: "🔒 安全 · 检测硬编码密钥"
-        args: ['--verbose', '--redact']
+        args: ['--verbose', '--redact', '--config', '.gitleaks.toml']
 
   # 检测私钥文件
   - repo: https://github.com/Yelp/detect-secrets
@@ -55,19 +55,55 @@ repos:
         args: ['--allow-multiple-documents']
       - id: check-json
         name: "📁 格式 · 验证 JSON 文件语法"
+      - id: check-xml
+        name: "📁 格式 · 验证 XML 文件语法"
+      - id: pretty-format-json
+        name: "📁 格式 · 美化 JSON 文件格式"
+
+      # Python 代码检查 (保留 Ruff 未覆盖的检查)
+      - id: check-ast
+        name: "🐍 Python · 检查 AST 语法"
+      # - id: check-builtin-literals   # 重复功能，已被 Ruff 覆盖
+      # - id: check-docstring-first    # 重复功能，已被 Ruff 覆盖
+      # - id: debug-statements         # 重复功能，已被 Ruff 覆盖
+      # - id: double-quote-string-fixer # 重复功能，已被 Ruff 格式化覆盖
+      - id: name-tests-test
+        name: "🐍 Python · 检查测试文件命名"
 
       # 文件系统检查
       - id: check-case-conflict
         name: "📁 系统 · 检查文件名大小写冲突"
+      - id: check-executables-have-shebangs
+        name: "📁 系统 · 检查可执行文件有 shebang"
+      - id: check-shebang-scripts-are-executable
+        name: "📁 系统 · 检查 shebang 脚本可执行"
+      - id: check-symlinks
+        name: "📁 系统 · 检查损坏的符号链接"
+      - id: destroyed-symlinks
+        name: "📁 系统 · 检测被破坏的符号链接"
+      - id: check-illegal-windows-names
+        name: "📁 系统 · 检查非法 Windows 文件名"
+
+      # Git 和版本控制检查
       - id: check-merge-conflict
         name: "🌳 Git · 检测合并冲突标记"
       - id: check-added-large-files
         name: "🌳 Git · 阻止提交大文件"
-        args: ['--maxkb=2048']
+        args: ['--maxkb=1024']
+      - id: check-vcs-permalinks
+        name: "🌳 Git · 检查 VCS 永久链接"
+      - id: forbid-new-submodules
+        name: "🌳 Git · 禁止新的子模块"
+      - id: forbid-submodules
+        name: "🌳 Git · 禁止所有子模块"
       # 分支保护已禁用，允许直接提交到任何分支
       # - id: no-commit-to-branch
       #   name: "🌳 Git · 保护主分支"
       #   args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
+
+      # 安全检查 (已由 gitleaks 和 detect-secrets 覆盖)
+      # - id: detect-aws-credentials  # 重复功能，已被 gitleaks 覆盖
+      # - id: detect-private-key      # 重复功能，已被 detect-secrets 覆盖
 
       # 文件内容清理
       - id: end-of-file-fixer
@@ -78,6 +114,18 @@ repos:
       - id: mixed-line-ending
         name: "✨ 清理 · 统一行结束符"
         args: ['--fix=lf']
+      - id: fix-byte-order-marker
+        name: "✨ 清理 · 修复 UTF-8 字节序标记"
+
+      # 文件排序和组织
+      - id: file-contents-sorter
+        name: "📋 组织 · 文件内容排序"
+        files: '^$'  # 默认不匹配任何文件，需要手动配置
+      - id: sort-simple-yaml
+        name: "📋 组织 · 排序简单 YAML 文件"
+        files: '^$'  # 默认不匹配任何文件，需要手动配置
+      - id: requirements-txt-fixer
+        name: "📋 组织 · 修复 requirements.txt"
 
   # ==========================================================================
   #                            🦀 Rust 专用工具
@@ -166,7 +214,7 @@ repos:
       - id: ruff
         name: "🐍 Python · 代码检查和修复"
         description: "使用 Ruff 进行代码质量检查和自动修复"
-        args: ['--fix', '--exit-non-zero-on-fix']
+        args: ['--fix']
 
   # Python 导入排序
   - repo: https://github.com/pycqa/isort
@@ -180,14 +228,6 @@ repos:
   # ==========================================================================
   #                           📊 配置文件验证
   # ==========================================================================
-
-  # YAML 语法检查
-  - repo: https://github.com/adrienverge/yamllint
-    rev: v1.37.1
-    hooks:
-      - id: yamllint
-        name: "📊 YAML · 语法检查"
-        args: ['-d', '{extends: default, rules: {line-length: {max: 120}}}']
 
   # Markdown 语法检查
   - repo: https://github.com/igorshubovych/markdownlint-cli

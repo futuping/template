@@ -1,0 +1,14 @@
+# Gitleaks 配置文件
+# 排除已知的合法文件
+
+# 排除的文件路径
+[allowlist]
+paths = [
+  ".secrets.baseline",  # secrets 基线文件包含已知的脱敏哈希值
+]
+
+# 排除的提交
+commits = []
+
+# 排除的正则表达式
+regexes = []
