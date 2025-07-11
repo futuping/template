@@ -4,7 +4,7 @@
 # GitHub CodeQL 静态代码分析，专门用于安全漏洞检测
 # 独立于主构建流程，确保安全检查的完整性和专业性
 
-name: "CodeQL 安全分析"
+name: "CodeQL"
 
 on:
   push:
