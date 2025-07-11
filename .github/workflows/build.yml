@@ -86,7 +86,7 @@ jobs:
 
       - name: 上传覆盖率 HTML 报告 (仅限 Linux)
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage-html
@@ -208,7 +208,7 @@ jobs:
           fi
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.target }}
           path: |
@@ -320,7 +320,7 @@ jobs:
           fi
 
       - name: 上传移动平台构建产物
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mobile-${{ matrix.platform }}-${{ matrix.target }}
           path: mobile-releases/
@@ -404,7 +404,7 @@ jobs:
           fi
 
       - name: 上传 Web 构建产物
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web-${{ matrix.target }}
           path: web-releases/
@@ -465,7 +465,7 @@ jobs:
 
       - name: 上传特殊平台构建产物
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: special-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/
@@ -527,7 +527,7 @@ jobs:
           echo "依赖树已生成"
 
       - name: 上传依赖分析结果
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dependency-analysis
           path: dependency-tree.txt
@@ -557,7 +557,7 @@ jobs:
           submodules: recursive
 
       - name: 下载所有构建产物
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: 组织发布文件结构
         run: |
