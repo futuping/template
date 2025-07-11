@@ -151,6 +151,8 @@ jobs:
   quality-analysis:
     name: 📊 代码质量分析
     runs-on: ubuntu-latest
+    # 只在主分支推送和发布时进行完整质量分析，PR 跳过以提高效率
+    if: github.event_name == 'push' || startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
         with:
