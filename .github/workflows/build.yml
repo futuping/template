@@ -19,99 +19,22 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # 安全检查作业
-  security:
-    name: 🔒 安全检查
+  # 高级安全审计 (pre-commit 未覆盖的高级功能)
+  security-audit:
+    name: 🛡️ 依赖漏洞审计
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
 
-      - name: 安装安全检查工具
+      - name: 安装安全审计工具
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
 
-      - name: 检测硬编码密钥和敏感信息
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Rust 依赖漏洞审计
         run: cargo audit
 
-  # 工作流验证作业
-  workflow-validation:
-    name: 📊 工作流验证
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 验证 YAML 语法
-        uses: ibiqlik/action-yamllint@v3
-        with:
-          file_or_dir: .github/workflows/
-          config_data: |
-            extends: default
-            rules:
-              line-length:
-                max: 120
-
-  # 代码质量检查作业
-  checks:
-    name: 🦀 代码质量检查
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: 安装 Rust 工具链
-        run: |
-          rustup toolchain install stable --component rustfmt,clippy
-          rustup default stable
-
-      - name: 安装附加工具
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny,typos-cli
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: checks
-
-      - name: 检查代码格式
-        run: cargo fmt -- --check
-
-      - name: 拼写检查
-        run: typos --format brief
-
-      - name: 安全和许可证检查
-        run: cargo deny check
-
-      - name: 检查代码错误
-        run: cargo check --all-targets --all-features
-
-      - name: Clippy 严格代码检查
-        run: |
-          cargo clippy --all-targets --all-features --tests --benches -- \
-          -D warnings \
-          -D clippy::all \
-          -D clippy::pedantic \
-          -D clippy::cognitive_complexity \
-          -D clippy::too_many_lines \
-          -A clippy::module_name_repetitions
-
-      - name: 文档生成检查
-        run: cargo doc --no-deps --document-private-items --all-features
-
-      - name: 文档测试
-        run: cargo test --doc --all-features
-
-  # 测试作业 - 支持多平台
+  # 测试作业 - 支持多平台 (pre-commit 已处理基础检查，这里专注测试和覆盖率)
   test:
     name: 🧪 测试 (${{ matrix.os }})
     strategy:
@@ -126,7 +49,6 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
-    needs: [security, workflow-validation, checks]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -173,7 +95,6 @@ jobs:
   benchmark:
     name: 📈 基准测试
     runs-on: ubuntu-latest
-    needs: checks
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -214,7 +135,7 @@ jobs:
             target: i686-unknown-linux-gnu
             use-cross: true
             platform: linux
-          
+
           # Windows 平台
           - os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -228,7 +149,7 @@ jobs:
             target: x86_64-pc-windows-gnu
             use-cross: true
             platform: windows
-          
+
           # macOS 平台
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -240,7 +161,7 @@ jobs:
             platform: macos
 
     runs-on: ${{ matrix.os }}
-    needs: [security, workflow-validation, checks, test]
+    needs: [security-audit, test]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -313,7 +234,7 @@ jobs:
             target: aarch64-apple-ios-sim
             platform: ios
             sdk: iphonesimulator
-          
+
           # Android 平台
           - os: ubuntu-latest
             target: aarch64-linux-android
@@ -333,7 +254,7 @@ jobs:
             arch: x86
 
     runs-on: ${{ matrix.os }}
-    needs: [security, workflow-validation, checks]
+    needs: [security-audit]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -358,7 +279,7 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
-          
+
       - name: 安装 Android NDK 工具链
         if: matrix.platform == 'android'
         run: |
@@ -367,13 +288,13 @@ jobs:
           cat >> ~/.cargo/config.toml << EOF
           [target.aarch64-linux-android]
           linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
-          
+
           [target.armv7-linux-androideabi]
           linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang"
-          
+
           [target.x86_64-linux-android]
           linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang"
-          
+
           [target.i686-linux-android]
           linker = "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android21-clang"
           EOF
@@ -419,7 +340,7 @@ jobs:
             bindgen: false
 
     runs-on: ubuntu-latest
-    needs: [security, workflow-validation, checks]
+    needs: [security-audit]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -435,7 +356,7 @@ jobs:
         run: |
           cargo install wasm-pack
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          
+
       - name: 安装 wasmtime (for WASI)
         if: matrix.target == 'wasm32-wasi'
         run: |
@@ -506,7 +427,7 @@ jobs:
             experimental: true
 
     runs-on: ${{ matrix.os }}
-    needs: [security, workflow-validation, checks]
+    needs: [security-audit]
     continue-on-error: ${{ matrix.experimental }}
     steps:
       - uses: actions/checkout@v4
@@ -517,7 +438,7 @@ jobs:
         run: |
           rustup toolchain install nightly
           rustup override set nightly
-          
+
       - name: 尝试添加目标平台
         continue-on-error: true
         run: rustup target add ${{ matrix.target }}
@@ -562,7 +483,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 构建结果" >> $GITHUB_STEP_SUMMARY
           echo "- 🖥️ **桌面平台**: ${{ needs.desktop-build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- 📱 **移动平台**: ${{ needs.mobile-build.result }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- 📱 **移动平台**: ${{ needs.mobile-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- 🌐 **Web 平台**: ${{ needs.web-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- 🔮 **特殊平台**: ${{ needs.special-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -583,11 +504,10 @@ jobs:
           echo "**特殊平台:**" >> $GITHUB_STEP_SUMMARY
           echo "- HarmonyOS (实验性支持)" >> $GITHUB_STEP_SUMMARY
 
-  # 代码质量分析
+  # 代码质量分析 (pre-commit 已处理基础检查，这里专注高级分析)
   quality-analysis:
     name: 📊 代码质量分析
     runs-on: ubuntu-latest
-    needs: checks
     steps:
       - uses: actions/checkout@v4
         with:
@@ -628,7 +548,7 @@ jobs:
   release:
     name: 🚀 创建发布
     runs-on: ubuntu-latest
-    needs: [security, workflow-validation, checks, test, desktop-build, mobile-build, web-build, special-build, quality-analysis]
+    needs: [security-audit, test, desktop-build, mobile-build, web-build, special-build, quality-analysis]
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
@@ -642,28 +562,28 @@ jobs:
       - name: 组织发布文件结构
         run: |
           mkdir -p releases/{desktop,mobile,web,special}
-          
+
           # 整理桌面平台文件
           find . -name "desktop-*" -type d | while read dir; do
             if [ -d "$dir" ]; then
               cp -r "$dir"/* releases/desktop/ 2>/dev/null || true
             fi
           done
-          
+
           # 整理移动平台文件
           find . -name "mobile-*" -type d | while read dir; do
             if [ -d "$dir" ]; then
               cp -r "$dir"/* releases/mobile/ 2>/dev/null || true
             fi
           done
-          
+
           # 整理 Web 平台文件
           find . -name "web-*" -type d | while read dir; do
             if [ -d "$dir" ]; then
               cp -r "$dir"/* releases/web/ 2>/dev/null || true
             fi
           done
-          
+
           # 整理特殊平台文件
           find . -name "special-*" -type d | while read dir; do
             if [ -d "$dir" ]; then
@@ -684,49 +604,49 @@ jobs:
         run: |
           cat > RELEASE_NOTES.md << 'EOF'
           ## 🚀 跨平台发布
-          
+
           本版本支持以下平台：
-          
+
           ### 🖥️ 桌面平台
           - **Linux**: x86_64, aarch64, musl, i686
           - **Windows**: x86_64, i686, GNU 工具链
           - **macOS**: Intel 和 Apple Silicon
-          
+
           ### 📱 移动平台
           - **iOS**: 设备 (aarch64) 和模拟器 (x86_64, aarch64)
           - **Android**: ARM64, ARMv7, x86_64, x86
-          
+
           ### 🌐 Web 平台
           - **WebAssembly**: 浏览器、Node.js、打包工具支持
           - **WASI**: 服务器端 WebAssembly
-          
+
           ### 🔮 实验性平台
           - **HarmonyOS**: 实验性支持 (aarch64, x86_64)
-          
+
           ---
-          
+
           EOF
           cat CHANGES.md >> RELEASE_NOTES.md
 
       - name: 创建平台特定的压缩包
         run: |
           cd releases
-          
+
           # 创建桌面平台压缩包
           if [ -d "desktop" ] && [ "$(ls -A desktop)" ]; then
             tar czvf ../desktop-all-platforms.tar.gz desktop/
           fi
-          
+
           # 创建移动平台压缩包
           if [ -d "mobile" ] && [ "$(ls -A mobile)" ]; then
             tar czvf ../mobile-all-platforms.tar.gz mobile/
           fi
-          
+
           # 创建 Web 平台压缩包
           if [ -d "web" ] && [ "$(ls -A web)" ]; then
             tar czvf ../web-all-platforms.tar.gz web/
           fi
-          
+
           # 创建特殊平台压缩包
           if [ -d "special" ] && [ "$(ls -A special)" ]; then
             tar czvf ../special-platforms.tar.gz special/
