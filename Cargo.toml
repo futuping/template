@@ -2,6 +2,7 @@
 name = "template"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.70.0"
 license = "MIT"
 description = "A template for a new Rust project"
 authors = ["Your Name <your.email@example.com>"]
