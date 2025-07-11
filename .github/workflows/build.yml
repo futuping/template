@@ -263,21 +263,30 @@ jobs:
           EOF
           cat CHANGES.md >> RELEASE_NOTES.md
 
-      - name: 创建 macOS 安装包
+      - name: 创建跨平台发布包
         run: |
           cd releases
 
-          # 创建 macOS 平台 DMG 安装包
+          # 创建 macOS 平台发布包
           if [ -d "macos" ] && [ "$(ls -A macos)" ]; then
-            hdiutil create -volname "macOS Universal" -srcfolder macos -ov -format UDZO ../macos-universal.dmg
+            echo "📦 创建 macOS 发布包..."
+            tar -czf ../template-macos-universal.tar.gz macos/
+            echo "✅ macOS 发布包创建完成: template-macos-universal.tar.gz"
+          else
+            echo "⚠️ 没有找到 macOS 构建产物"
           fi
+
+          # 显示发布包信息
+          cd ..
+          echo "📋 发布包列表:"
+          ls -lh *.tar.gz 2>/dev/null || echo "没有找到发布包"
 
       - name: 创建发布
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_NOTES.md
           files: |
-            macos-universal.dmg
+            template-macos-universal.tar.gz
             macos-*/*
           draft: false
           prerelease: false
