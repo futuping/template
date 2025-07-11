@@ -1,0 +1,146 @@
+# =============================================================================
+# 🧪 Nextest 配置文件 - 优化版
+# =============================================================================
+# 详细文档: https://nexte.st/docs/configuration/
+# 配置参考: https://nexte.st/docs/configuration/configuration-reference
+
+[profile.default]
+# 本地开发默认配置
+retries = 0
+test-threads = "num-cpus"
+slow-timeout = { period = "60s", terminate-after = 2 }
+leak-timeout = "100ms"
+fail-fast = false                    # 显示所有测试结果
+
+# 输出控制 - 本地开发时减少噪音
+success-output = "never"             # 成功测试不显示输出
+failure-output = "immediate"         # 失败测试立即显示
+status-level = "retry"               # 只显示重试和失败
+
+# CI 环境专用配置
+[profile.ci]
+# 重试失败的测试以减少因网络等问题导致的假阳性
+retries = 2
+
+# CI 环境通常资源有限，使用保守的线程数
+# 避免资源竞争导致的不稳定
+test-threads = 2
+
+# CI 环境中测试可能更慢，增加超时时间
+slow-timeout = { period = "120s", terminate-after = 3 }
+leak-timeout = "500ms"
+
+# CI 需要快速失败以节省时间和资源
+fail-fast = true
+
+# CI 输出控制 - 需要详细信息用于调试
+success-output = "immediate"         # 显示所有输出便于调试
+failure-output = "immediate"         # 失败立即显示
+status-level = "pass"                # 显示通过的测试
+final-status-level = "flaky"         # 显示不稳定的测试
+
+# JUnit 报告配置 - CI 系统集成
+[profile.ci.junit]
+path = "junit.xml"                   # JUnit XML 报告路径
+
+# 开发环境快速测试配置
+[profile.quick]
+retries = 0
+test-threads = "num-cpus"
+slow-timeout = { period = "30s", terminate-after = 1 }
+# 只运行快速测试，跳过标记为 slow 的测试
+filter = 'not test(slow)'
+# 快速失败，提高开发效率
+fail-fast = true
+
+# 输出控制 - 快速验证时减少噪音
+success-output = "never"
+failure-output = "immediate"
+status-level = "fail"                # 只显示失败
+
+# 覆盖率测试配置
+[profile.coverage]
+retries = 0
+test-threads = 1                     # 单线程确保覆盖率数据准确
+slow-timeout = { period = "300s", terminate-after = 1 }
+# 覆盖率测试需要完整运行，不使用 fail-fast
+fail-fast = false
+
+# 覆盖率输出控制
+success-output = "never"
+failure-output = "immediate"
+status-level = "pass"                # 显示进度信息
+
+# 快速失败配置 - 用于本地快速验证
+[profile.fast-fail]
+retries = 0
+test-threads = "num-cpus"
+slow-timeout = { period = "10s", terminate-after = 1 }
+fail-fast = true
+# 只显示失败信息，减少输出
+success-output = "never"
+failure-output = "immediate"
+status-level = "fail"                # 只显示失败，最少噪音
+
+# 调试配置 - 单线程详细输出
+[profile.debug]
+retries = 0
+test-threads = 1                     # 单线程便于调试
+slow-timeout = { period = "600s", terminate-after = 1 }  # 长超时支持断点调试
+fail-fast = true                     # 遇到问题立即停止
+leak-timeout = "1s"                  # 更宽松的内存泄漏检测
+
+# 调试输出 - 显示所有信息
+success-output = "immediate"
+failure-output = "immediate"
+status-level = "all"                 # 显示所有状态信息
+final-status-level = "all"
+
+# 压力测试配置 - 用于发现竞态条件等问题
+[profile.stress]
+retries = 0
+# 故意过载以发现并发问题
+test-threads = 16
+slow-timeout = { period = "180s", terminate-after = 1 }
+fail-fast = false                    # 运行所有测试发现所有问题
+
+# 压力测试输出
+success-output = "never"
+failure-output = "immediate"
+status-level = "retry"               # 显示重试和失败
+
+# 性能基准测试配置
+[profile.bench]
+retries = 0
+test-threads = 1                     # 单线程确保基准测试准确性
+slow-timeout = { period = "600s", terminate-after = 1 }  # 基准测试可能很慢
+fail-fast = false
+
+# 基准测试输出
+success-output = "immediate"
+failure-output = "immediate"
+status-level = "pass"
+
+# =============================================================================
+# 使用说明
+# =============================================================================
+#
+# 日常使用：
+#   cargo nextest run                    # 默认配置
+#   cargo nextest run --profile quick    # 快速测试（跳过慢测试）
+#   cargo nextest run --profile fast-fail # 极速验证（10秒超时）
+#
+# CI/CD 环境：
+#   cargo nextest run --profile ci       # CI 配置（包含 JUnit 报告）
+#
+# 开发调试：
+#   cargo nextest run --profile debug    # 单线程调试
+#   cargo nextest run --profile stress   # 压力测试
+#
+# 代码质量：
+#   cargo nextest run --profile coverage # 覆盖率测试
+#   cargo nextest run --profile bench    # 性能基准测试
+#
+# 环境变量覆盖：
+#   NEXTEST_RETRIES=3 cargo nextest run
+#   NEXTEST_TEST_THREADS=8 cargo nextest run --profile quick
