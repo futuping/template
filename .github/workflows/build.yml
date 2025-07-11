@@ -9,7 +9,7 @@ on:
   pull_request:
     branches:
       - main
-  # 新增：CodeQL 完成后也可以触发（用于串行模式）
+  # 新增：CodeQL 完成后触发（仅当没有其他CI/CD运行时）
   workflow_run:
     workflows: ["CodeQL"]
     types:
@@ -32,6 +32,8 @@ jobs:
   audit:
     name: 🛡️ 依赖漏洞审计
     runs-on: ubuntu-latest
+    # 跳过 workflow_run 触发时的重复审计，因为之前的运行已经完成
+    if: github.event_name != 'workflow_run'
     steps:
       - uses: actions/checkout@v4
 
@@ -100,6 +102,8 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
+    # 跳过 workflow_run 触发时的重复测试，因为之前的运行已经完成测试
+    if: github.event_name != 'workflow_run'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,6 +167,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [audit]
     continue-on-error: ${{ matrix.experimental }}
+    # 跳过 workflow_run 触发时的重复构建，因为构建产物应该已经存在
+    if: github.event_name != 'workflow_run'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -203,8 +209,68 @@ jobs:
     name: 🚀 创建发布
     runs-on: ubuntu-latest
     needs: [audit, test, build, quality-analysis]
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    # 允许在某些依赖作业被跳过时仍然运行（如 workflow_run 触发时）
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
+      (needs.quality-analysis.result == 'success' || needs.quality-analysis.result == 'skipped')
     steps:
+      - name: 🔍 检查重复发布避免资源浪费
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('🔍 开始检查是否有重复的发布流程...');
+
+            // 获取当前仓库的所有工作流运行
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml',
+              status: 'in_progress',
+              per_page: 10
+            });
+
+            // 过滤出当前提交的相关运行
+            const currentSha = context.sha;
+            const currentRunId = context.runId;
+
+            const relatedRuns = runs.workflow_runs.filter(run =>
+              run.head_sha === currentSha &&
+              run.id !== currentRunId &&
+              run.status === 'in_progress'
+            );
+
+            console.log(`📊 发现 ${relatedRuns.length} 个相关的进行中运行`);
+
+            if (relatedRuns.length > 0) {
+              // 检查是否有发布作业正在运行
+              for (const run of relatedRuns) {
+                console.log(`🔍 检查运行 #${run.run_number}: ${run.name}`);
+
+                try {
+                  const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id
+                  });
+
+                  const releaseJob = jobs.jobs.find(job => job.name.includes('创建发布'));
+                  if (releaseJob && releaseJob.status === 'in_progress') {
+                    console.log('⚠️ 发现重复的发布作业正在运行，跳过当前发布避免冲突');
+                    core.setFailed('跳过重复的发布流程，避免资源浪费和潜在冲突');
+                    return;
+                  }
+                } catch (error) {
+                  console.log(`⚠️ 检查作业时出错: ${error.message}`);
+                }
+              }
+            }
+
+            console.log('✅ 未发现重复发布，继续执行当前发布流程');
+
       - name: 等待 CodeQL 安全分析完成（串行发布策略）
         uses: actions/github-script@v7
         with:
