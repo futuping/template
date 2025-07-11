@@ -236,7 +236,7 @@ jobs:
 
                 // 查找 CodeQL 工作流
                 const codeqlRuns = allRuns.workflow_runs.filter(run =>
-                  run.name === 'CodeQL 安全分析' || run.path === '.github/workflows/codeql.yml'
+                  run.name === 'CodeQL' || run.path === '.github/workflows/codeql.yml'
                 );
 
                 if (codeqlRuns.length > 0) {
