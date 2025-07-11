@@ -262,16 +262,39 @@ jobs:
       - name: 下载 macOS 构建产物
         uses: actions/download-artifact@v4
 
+      - name: 调试文件结构
+        run: |
+          echo "📋 下载后的文件结构:"
+          find . -name "macos-*" -type d | head -10
+          echo ""
+          echo "📄 详细文件列表:"
+          find . -name "macos-*" -type d -exec ls -la {} \;
+
       - name: 组织发布文件结构
         run: |
           mkdir -p releases/macos
 
-          # 整理 macOS 平台文件
+          # 整理 macOS 平台文件，同时保留原始目录
           find . -name "macos-*" -type d | while read dir; do
             if [ -d "$dir" ]; then
+              echo "📁 处理目录: $dir"
+              # 复制到统一目录用于打包
               cp -r "$dir"/* releases/macos/ 2>/dev/null || true
+              # 重命名单独的二进制文件以便上传
+              if [ -f "$dir/template" ]; then
+                target_name=$(basename "$dir")
+                cp "$dir/template" "template-${target_name#macos-}"
+                echo "✅ 创建单独二进制: template-${target_name#macos-}"
+              fi
             fi
           done
+
+          echo ""
+          echo "📋 最终文件结构:"
+          ls -la
+          echo ""
+          echo "📦 releases/macos 内容:"
+          ls -la releases/macos/ 2>/dev/null || echo "目录为空"
 
       - name: 生成变更日志
         uses: orhun/git-cliff-action@v2
@@ -322,7 +345,8 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             template-macos-universal.tar.gz
-            macos-*/template
+            template-aarch64-apple-darwin
+            template-x86_64-apple-darwin
           draft: false
           prerelease: false
           name: "Release ${{ github.ref_name }} - macOS 支持"
