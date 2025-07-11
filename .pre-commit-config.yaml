@@ -64,9 +64,10 @@ repos:
       - id: check-added-large-files
         name: "🌳 Git · 阻止提交大文件"
         args: ['--maxkb=2048']
-      - id: no-commit-to-branch
-        name: "🌳 Git · 保护主分支"
-        args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
+      # 分支保护已禁用，允许直接提交到任何分支
+      # - id: no-commit-to-branch
+      #   name: "🌳 Git · 保护主分支"
+      #   args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
 
       # 文件内容清理
       - id: end-of-file-fixer
