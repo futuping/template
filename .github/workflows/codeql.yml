@@ -30,7 +30,7 @@ jobs:
     name: 🔍 CodeQL 安全分析
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -44,11 +44,11 @@ jobs:
           submodules: recursive
 
       - name: 初始化 CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
-          
+
       - name: 安装 Rust 工具链
         run: |
           rustup toolchain install stable
@@ -62,7 +62,7 @@ jobs:
 
       # 自动构建尝试，如果失败则使用手动构建
       - name: 自动构建
-        uses: github/codeql-action/autobuild@v2
+        uses: github/codeql-action/autobuild@v3
         continue-on-error: true
         id: autobuild
 
@@ -75,7 +75,7 @@ jobs:
           cargo build --all-targets --all-features --verbose
 
       - name: 执行 CodeQL 分析
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{matrix.language}}"
           upload: true
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: analyze
     if: always()
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -107,4 +107,4 @@ jobs:
             echo "✅ **状态**: 分析成功完成" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **状态**: 分析过程中出现问题" >> $GITHUB_STEP_SUMMARY
-          fi 
+          fi
