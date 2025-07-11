@@ -21,28 +21,28 @@ repos:
   # ==========================================================================
   #                           🔒 安全检查工具
   # ==========================================================================
-  
+
   # 检测硬编码密钥和敏感信息
-  # - repo: https://github.com/gitleaks/gitleaks
-  #   rev: v8.27.2
-  #   hooks:
-  #     - id: gitleaks
-  #       name: "🔒 安全 · 检测硬编码密钥"
-  #       args: ['--verbose', '--redact']
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.27.2
+    hooks:
+      - id: gitleaks
+        name: "🔒 安全 · 检测硬编码密钥"
+        args: ['--verbose', '--redact']
 
   # 检测私钥文件
-  # - repo: https://github.com/Yelp/detect-secrets
-  #   rev: v1.5.0
-  #   hooks:
-  #     - id: detect-secrets
-  #       name: "🔒 安全 · 检测密钥和敏感信息"
-  #       args: ['--baseline', '.secrets.baseline']
-  #       exclude: \.secrets\.baseline$
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: "🔒 安全 · 检测密钥和敏感信息"
+        args: ['--baseline', '.secrets.baseline']
+        exclude: \.secrets\.baseline$
 
   # ==========================================================================
   #                          📁 文件系统和通用检查
   # ==========================================================================
-  
+
   # 预提交官方钩子集合
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -55,7 +55,7 @@ repos:
         args: ['--allow-multiple-documents']
       - id: check-json
         name: "📁 格式 · 验证 JSON 文件语法"
-      
+
       # 文件系统检查
       - id: check-case-conflict
         name: "📁 系统 · 检查文件名大小写冲突"
@@ -67,7 +67,7 @@ repos:
       - id: no-commit-to-branch
         name: "🌳 Git · 保护主分支"
         args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
-      
+
       # 文件内容清理
       - id: end-of-file-fixer
         name: "✨ 清理 · 确保文件以换行符结尾"
@@ -81,7 +81,7 @@ repos:
   # ==========================================================================
   #                            🦀 Rust 专用工具
   # ==========================================================================
-  
+
   - repo: local
     hooks:
       # 代码格式化检查
@@ -92,7 +92,7 @@ repos:
         language: rust
         files: \.rs$
         pass_filenames: false
-        
+
       # 编译检查
       - id: cargo-check
         name: "🦀 Rust · 编译检查"
@@ -101,7 +101,7 @@ repos:
         language: rust
         files: \.rs$
         pass_filenames: false
-        
+
       # Clippy 代码质量检查
       - id: cargo-clippy
         name: "🦀 Rust · Clippy 代码质量检查"
@@ -110,7 +110,7 @@ repos:
         language: rust
         files: \.rs$
         pass_filenames: false
-        
+
       # 依赖安全检查
       - id: cargo-deny
         name: "🦀 Rust · 依赖安全检查"
@@ -119,7 +119,7 @@ repos:
         language: rust
         files: \.rs$|Cargo\.toml$|Cargo\.lock$
         pass_filenames: false
-        
+
       # 单元测试
       - id: cargo-test
         name: "🦀 Rust · 运行单元测试"
@@ -128,7 +128,7 @@ repos:
         language: rust
         files: \.rs$
         pass_filenames: false
-        
+
       # 文档生成检查
       - id: cargo-doc
         name: "🦀 Rust · 文档生成检查"
@@ -138,10 +138,20 @@ repos:
         files: \.rs$
         pass_filenames: false
 
+      # 拼写检查
+      - id: typos
+        name: "🔍 拼写 · 检查代码和文档中的拼写错误"
+        description: "使用 typos 检查拼写错误"
+        entry: typos
+        language: rust
+        files: \.*$
+        pass_filenames: false
+        args: ['--format=brief']
+
   # ==========================================================================
   #                            🐍 Python 专用工具 (基础版本)
   # ==========================================================================
-  
+
   # Ruff - 现代 Python 代码格式化和静态检查工具
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.2
@@ -150,7 +160,7 @@ repos:
       - id: ruff-format
         name: "🐍 Python · 代码格式化"
         description: "使用 Ruff 格式化 Python 代码"
-      
+
       # Python 代码检查和自动修复
       - id: ruff
         name: "🐍 Python · 代码检查和修复"
@@ -167,21 +177,9 @@ repos:
         args: ['--profile', 'black', '--line-length', '88']
 
   # ==========================================================================
-  #                           🔍 拼写检查
-  # ==========================================================================
-  
-  # 拼写检查
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.34.0
-    hooks:
-      - id: typos
-        name: "🔍 拼写 · 检查代码和文档中的拼写错误"
-        args: ['--format=brief']
-
-  # ==========================================================================
   #                           📊 配置文件验证
   # ==========================================================================
-  
+
   # YAML 语法检查
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.37.1
