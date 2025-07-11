@@ -9,6 +9,15 @@ on:
   pull_request:
     branches:
       - main
+  # 新增：CodeQL 完成后也可以触发（用于串行模式）
+  workflow_run:
+    workflows: ["CodeQL 安全分析"]
+    types:
+      - completed
+    branches:
+      - main
+  # 手动触发（用于调试）
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -194,65 +203,73 @@ jobs:
     name: 🚀 创建发布
     runs-on: ubuntu-latest
     needs: [security-audit, test, special-build, quality-analysis]
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
-      - name: 等待 CodeQL 安全分析完成
+      - name: 等待 CodeQL 安全分析完成（串行发布策略）
         uses: actions/github-script@v7
         with:
           script: |
-            console.log('🔍 检查 CodeQL 安全分析状态...');
+            console.log('🔍 实施串行发布策略：等待 CodeQL 安全分析完成...');
 
-            try {
-              // 获取当前提交的所有工作流运行
-              const { data: allRuns } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: context.sha,
-                per_page: 50
-              });
-
-              console.log(`📋 找到 ${allRuns.workflow_runs.length} 个工作流运行`);
-
-              // 查找 CodeQL 工作流
-              const codeqlRuns = allRuns.workflow_runs.filter(run =>
-                run.name === 'CodeQL 安全分析' || run.path === '.github/workflows/codeql.yml'
-              );
-
-              console.log(`🔍 找到 ${codeqlRuns.length} 个 CodeQL 工作流运行`);
-
-              if (codeqlRuns.length === 0) {
-                console.log('⚠️ 未找到 CodeQL 工作流运行，可能还未开始');
-                console.log('💡 跳过 CodeQL 检查，继续发布流程');
-                return;
-              }
-
-              const latestCodeqlRun = codeqlRuns[0];
-              console.log(`📊 最新 CodeQL 运行状态: ${latestCodeqlRun.status}`);
-              console.log(`📊 运行结论: ${latestCodeqlRun.conclusion || '进行中'}`);
-
-              // 检查运行状态
-              if (latestCodeqlRun.status !== 'completed') {
-                console.log('⏳ CodeQL 分析仍在进行中');
-                console.log('💡 跳过等待，继续发布流程');
-                return;
-              }
-
-              // 检查运行结果
-              if (latestCodeqlRun.conclusion === 'failure') {
-                core.setFailed('❌ CodeQL 安全分析发现问题，发布已暂停');
-                return;
-              }
-
-              if (latestCodeqlRun.conclusion === 'success') {
-                console.log('✅ CodeQL 安全分析成功完成');
-              } else {
-                console.log(`ℹ️ CodeQL 分析完成，结论: ${latestCodeqlRun.conclusion}`);
-              }
-
-            } catch (error) {
-              console.log(`⚠️ 检查 CodeQL 状态时出错: ${error.message}`);
-              console.log('💡 跳过 CodeQL 检查，继续发布流程');
+            // 如果是通过 workflow_run 触发，CodeQL 已经成功
+            if (context.eventName === 'workflow_run') {
+              console.log('✅ 通过 workflow_run 触发，CodeQL 已经成功完成');
+              return;
             }
+
+            // 否则需要主动等待 CodeQL 完成
+            const maxWaitTime = 20 * 60 * 1000; // 20分钟
+            const checkInterval = 30 * 1000;    // 30秒检查一次
+            const startTime = Date.now();
+
+            console.log('⏳ 开始等待 CodeQL 分析完成（最长等待20分钟）...');
+
+            while (Date.now() - startTime < maxWaitTime) {
+              try {
+                // 获取当前提交的所有工作流运行
+                const { data: allRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head_sha: context.sha,
+                  per_page: 50
+                });
+
+                // 查找 CodeQL 工作流
+                const codeqlRuns = allRuns.workflow_runs.filter(run =>
+                  run.name === 'CodeQL 安全分析' || run.path === '.github/workflows/codeql.yml'
+                );
+
+                if (codeqlRuns.length > 0) {
+                  const latestRun = codeqlRuns[0];
+                  console.log(`📊 CodeQL 状态: ${latestRun.status}, 结论: ${latestRun.conclusion || '进行中'}`);
+
+                  if (latestRun.status === 'completed') {
+                    if (latestRun.conclusion === 'success') {
+                      console.log('✅ CodeQL 安全分析成功完成，继续发布流程');
+                      return;
+                    } else if (latestRun.conclusion === 'failure') {
+                      core.setFailed('❌ CodeQL 安全分析失败，发布已终止');
+                      return;
+                    } else {
+                      console.log(`ℹ️ CodeQL 完成但结论为: ${latestRun.conclusion}，继续发布`);
+                      return;
+                    }
+                  }
+                }
+
+                // 等待下次检查
+                const elapsed = Math.round((Date.now() - startTime) / 1000);
+                console.log(`⏳ 等待中... (已等待 ${elapsed}s)`);
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+
+              } catch (error) {
+                console.log(`⚠️ 检查过程中出错: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+              }
+            }
+
+            console.log('⏰ 等待超时，但继续发布流程（避免阻塞）');
+            core.warning('CodeQL 等待超时，但继续发布流程');
 
       - uses: actions/checkout@v4
         with:
