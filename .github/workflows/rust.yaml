@@ -157,7 +157,7 @@ jobs:
         id: git-cliff
         with:
           config: cliff.toml
-          args: -vv --latest --strip header,footer
+          args: --latest --strip all
         env:
           OUTPUT: CHANGES.md
           GITHUB_REPO: ${{ github.repository }}
@@ -165,9 +165,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # tag_name: ${{ github.ref_name }}
-          # name: Release ${{ github.ref_name }}
-          body: ${{ steps.git-cliff.outputs.content }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ${{ steps.git-cliff.outputs.content }}
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

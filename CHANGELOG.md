@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ---
-## [unreleased]
+## [0.5.0]($REPO/compare/v0.4.2..v0.5.0) - 2025-07-12
 
 ### 🚀 Features
 
@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - add markdownlint ignore file for CHANGELOG.md - ([29d8ba4]($REPO/commit/29d8ba4772cc70db9da6d228de9de585bfa24eeb)) - Maverick Tuping Fu
+- bump version to 0.5.0 and update changelog - ([bd78d02]($REPO/commit/bd78d02e08a5eee0906eb62781a50cdb3034a32a)) - Maverick Tuping Fu
 
 ---
 ## [0.4.2]($REPO/compare/v0.4.1..v0.4.2) - 2025-07-12
