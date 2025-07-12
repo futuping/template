@@ -10,6 +10,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # sccache 配置
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   # ===========================================
@@ -21,6 +24,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Rust Cache - 缓存依赖和 target 目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+          cache-on-failure: true
+
+      # sccache - 缓存编译结果
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo hack check --rust-version --workspace --all-targets --ignore-private
 
@@ -38,6 +53,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # Rust Cache - 缓存依赖和 target 目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: security-${{ matrix.toolchain }}
+          cache-on-failure: true
+
+      # sccache - 缓存编译结果
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       # 安全审计
       - uses: taiki-e/install-action@cargo-audit
@@ -69,6 +95,18 @@ jobs:
         toolchain: [stable, nightly]
     steps:
       - uses: actions/checkout@v4
+
+      # Rust Cache - 缓存依赖和 target 目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.toolchain }}
+          cache-on-failure: true
+
+      # sccache - 缓存编译结果
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
 
       # 构建验证
@@ -96,6 +134,17 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     steps:
       - uses: actions/checkout@v4
+
+      # Rust Cache - 缓存依赖和 target 目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: build-artifacts-macos-nightly
+          cache-on-failure: true
+
+      # sccache - 缓存编译结果
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Setup Rust
         run: rustup update nightly && rustup default nightly
@@ -185,6 +234,18 @@ jobs:
       CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
     steps:
       - uses: actions/checkout@v4
+
+      # Rust Cache - 缓存依赖和 target 目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: latest-deps-stable
+          cache-on-failure: true
+
+      # sccache - 缓存编译结果
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - run: rustup update stable && rustup default stable
       - run: cargo update --verbose
       - run: cargo check --verbose
