@@ -63,10 +63,6 @@ repos:
       # Python 代码检查 (保留 Ruff 未覆盖的检查)
       - id: check-ast
         name: "🐍 Python · 检查 AST 语法"
-      # - id: check-builtin-literals   # 重复功能，已被 Ruff 覆盖
-      # - id: check-docstring-first    # 重复功能，已被 Ruff 覆盖
-      # - id: debug-statements         # 重复功能，已被 Ruff 覆盖
-      # - id: double-quote-string-fixer # 重复功能，已被 Ruff 格式化覆盖
       - id: name-tests-test
         name: "🐍 Python · 检查测试文件命名"
 
@@ -101,10 +97,6 @@ repos:
       #   name: "🌳 Git · 保护主分支"
       #   args: ['--branch', 'main', '--branch', 'master', '--branch', 'develop']
 
-      # 安全检查 (已由 gitleaks 和 detect-secrets 覆盖)
-      # - id: detect-aws-credentials  # 重复功能，已被 gitleaks 覆盖
-      # - id: detect-private-key      # 重复功能，已被 detect-secrets 覆盖
-
       # 文件内容清理
       - id: end-of-file-fixer
         name: "✨ 清理 · 确保文件以换行符结尾"
@@ -120,10 +112,8 @@ repos:
       # 文件排序和组织
       - id: file-contents-sorter
         name: "📋 组织 · 文件内容排序"
-        files: '^$'  # 默认不匹配任何文件，需要手动配置
       - id: sort-simple-yaml
         name: "📋 组织 · 排序简单 YAML 文件"
-        files: '^$'  # 默认不匹配任何文件，需要手动配置
       - id: requirements-txt-fixer
         name: "📋 组织 · 修复 requirements.txt"
 
@@ -133,77 +123,68 @@ repos:
 
   - repo: local
     hooks:
-      # 代码格式化检查
+      # 代码格式化检查 - 使用 entry 因为需要复杂的 cargo 参数
       - id: cargo-fmt
         name: "🦀 Rust · 代码格式化检查"
-        description: "使用 rustfmt 检查代码格式"
         entry: bash -c 'cargo fmt --all -- --check'
         language: rust
         files: \.rs$
         pass_filenames: false
 
-      # 编译检查
+      # 编译检查 - 使用 entry + args 组合，更清晰
       - id: cargo-check
         name: "🦀 Rust · 编译检查"
-        description: "检查代码是否能正常编译"
-        entry: bash -c 'cargo check --all-targets --all-features'
+        entry: cargo
         language: rust
         files: \.rs$
         pass_filenames: false
+        args: ['check', '--all-targets', '--all-features']
 
-      # Clippy 代码质量检查
+      # Clippy 代码质量检查 - 使用 entry 因为需要复杂的参数组合
       - id: cargo-clippy
         name: "🦀 Rust · Clippy 代码质量检查"
-        description: "使用 Clippy 进行代码质量分析"
         entry: bash -c 'cargo clippy --all-targets --all-features -- -D warnings'
         language: rust
         files: \.rs$
         pass_filenames: false
 
-      # 依赖安全检查
+      # 依赖安全检查 - 使用 entry + args 组合，更清晰
       - id: cargo-deny
         name: "🦀 Rust · 依赖安全检查"
-        description: "检查依赖的安全性和许可证"
-        entry: bash -c 'cargo deny check'
+        entry: cargo
         language: rust
         files: \.rs$|Cargo\.toml$|Cargo\.lock$
         pass_filenames: false
+        args: ['deny', 'check']
 
-      # 单元测试
+      # 单元测试 - 使用 entry + args 组合，更清晰
       - id: cargo-test
         name: "🦀 Rust · 运行单元测试"
-        description: "运行项目的单元测试"
-        entry: bash -c 'cargo nextest run --all-features'
+        entry: cargo
         language: rust
         files: \.rs$
         pass_filenames: false
+        args: ['nextest', 'run', '--all-features']
 
-      # 文档生成检查
+      # 文档生成检查 - 使用 entry + args 组合，更清晰
       - id: cargo-doc
         name: "🦀 Rust · 文档生成检查"
-        description: "检查文档是否能正常生成"
-        entry: bash -c 'cargo doc --no-deps --document-private-items'
+        entry: cargo
         language: rust
         files: \.rs$
         pass_filenames: false
+        args: ['doc', '--no-deps', '--document-private-items']
 
-      # 自动生成/更新 CHANGELOG.md
-      - id: git-cliff-changelog
-        name: "📝 生成 CHANGELOG.md"
-        description: "使用 git-cliff 自动生成/更新 CHANGELOG.md"
-        entry: bash -c 'git cliff -o CHANGELOG.md'
-        language: system
-        pass_filenames: false
-        always_run: true
+  # ==========================================================================
+  #                            🔍 拼写检查工具
+  # ==========================================================================
 
-      # 拼写检查
+  # 拼写检查 - 使用标准 repo，无需自定义 entry
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.20.10
+    hooks:
       - id: typos
         name: "🔍 拼写 · 检查代码和文档中的拼写错误"
-        description: "使用 typos 检查拼写错误"
-        entry: typos
-        language: rust
-        files: \.*$
-        pass_filenames: false
         args: ['--format=brief']
 
   # ==========================================================================
@@ -214,34 +195,45 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.2
     hooks:
-      # Python 代码格式化
+      # Python 代码格式化 - 使用默认 entry，无需额外参数
       - id: ruff-format
         name: "🐍 Python · 代码格式化"
-        description: "使用 Ruff 格式化 Python 代码"
 
-      # Python 代码检查和自动修复
+      # Python 代码检查和自动修复 - 使用 args 传递参数
       - id: ruff
         name: "🐍 Python · 代码检查和修复"
-        description: "使用 Ruff 进行代码质量检查和自动修复"
         args: ['--fix']
 
   # Python 导入排序
   - repo: https://github.com/pycqa/isort
     rev: 6.0.1
     hooks:
+      # 使用 args 传递多个参数
       - id: isort
         name: "🐍 Python · 导入排序"
-        description: "使用 isort 排序和格式化导入语句"
         args: ['--profile', 'black', '--line-length', '88']
 
   # ==========================================================================
   #                           📊 配置文件验证
   # ==========================================================================
 
+  # Markdown 格式化
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.21
+    hooks:
+      # 使用默认 entry，通过 additional_dependencies 配置
+      - id: mdformat
+        name: "📝 Markdown · 格式化"
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-ruff
+          - ruff
+
   # Markdown 语法检查
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.45.0
     hooks:
+      # 使用 args 传递修复参数
       - id: markdownlint
         name: "📝 Markdown · 语法检查"
         args: ['--fix']
