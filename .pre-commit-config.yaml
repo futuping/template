@@ -1,8 +1,6 @@
 # =============================================================================
-# 🚀 Pre-commit Configuration - 优化版本
+# 🚀 Pre-commit Configuration
 # =============================================================================
-# 移除了有问题的仓库和重复功能，专注于Rust项目的核心代码质量控制
-# 保留了最稳定和必要的工具，避免功能重叠
 
 fail_fast: false
 exclude: |
@@ -123,7 +121,7 @@ repos:
 
   - repo: local
     hooks:
-      # 代码格式化检查 - 使用 entry 因为需要复杂的 cargo 参数
+      # 代码格式化检查
       - id: cargo-fmt
         name: "🦀 Rust · 代码格式化检查"
         entry: bash -c 'cargo fmt --all -- --check'
@@ -131,7 +129,7 @@ repos:
         files: \.rs$
         pass_filenames: false
 
-      # 编译检查 - 使用 entry + args 组合，更清晰
+      # 编译检查
       - id: cargo-check
         name: "🦀 Rust · 编译检查"
         entry: cargo
@@ -140,7 +138,7 @@ repos:
         pass_filenames: false
         args: ['check', '--all-targets', '--all-features']
 
-      # Clippy 代码质量检查 - 使用 entry 因为需要复杂的参数组合
+      # Clippy 代码质量检查
       - id: cargo-clippy
         name: "🦀 Rust · Clippy 代码质量检查"
         entry: bash -c 'cargo clippy --all-targets --all-features -- -D warnings'
@@ -148,7 +146,7 @@ repos:
         files: \.rs$
         pass_filenames: false
 
-      # 依赖安全检查 - 使用 entry + args 组合，更清晰
+      # 依赖安全检查
       - id: cargo-deny
         name: "🦀 Rust · 依赖安全检查"
         entry: cargo
@@ -157,7 +155,7 @@ repos:
         pass_filenames: false
         args: ['deny', 'check']
 
-      # 单元测试 - 使用 entry + args 组合，更清晰
+      # 单元测试
       - id: cargo-test
         name: "🦀 Rust · 运行单元测试"
         entry: cargo
@@ -166,7 +164,7 @@ repos:
         pass_filenames: false
         args: ['nextest', 'run', '--all-features']
 
-      # 文档生成检查 - 使用 entry + args 组合，更清晰
+      # 文档生成检查
       - id: cargo-doc
         name: "🦀 Rust · 文档生成检查"
         entry: cargo
@@ -175,16 +173,12 @@ repos:
         pass_filenames: false
         args: ['doc', '--no-deps', '--document-private-items']
 
-  # ==========================================================================
-  #                            🔍 拼写检查工具
-  # ==========================================================================
-
-  # 拼写检查 - 使用标准 repo，无需自定义 entry
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.20.10
-    hooks:
       - id: typos
         name: "🔍 拼写 · 检查代码和文档中的拼写错误"
+        entry: typos
+        language: rust
+        files: \.*$
+        pass_filenames: false
         args: ['--format=brief']
 
   # ==========================================================================
@@ -195,7 +189,7 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.2
     hooks:
-      # Python 代码格式化 - 使用默认 entry，无需额外参数
+      # Python 代码格式化
       - id: ruff-format
         name: "🐍 Python · 代码格式化"
 
@@ -219,9 +213,9 @@ repos:
 
   # Markdown 格式化
   - repo: https://github.com/hukkin/mdformat
-    rev: 0.7.21
+    rev: 0.7.22
     hooks:
-      # 使用默认 entry，通过 additional_dependencies 配置
+      # Markdown 格式化配置
       - id: mdformat
         name: "📝 Markdown · 格式化"
         additional_dependencies:
