@@ -165,12 +165,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          # tag_name: ${{ github.ref_name }}
+          # name: Release ${{ github.ref_name }}
           body: ${{ steps.git-cliff.outputs.content }}
           files: artifacts/*
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

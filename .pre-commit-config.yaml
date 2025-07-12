@@ -195,7 +195,6 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
 
       # 拼写检查
       - id: typos
