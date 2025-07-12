@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-07-12
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog and workflows
+
 ## [0.4.1] - 2025-07-12
 
 ### 🐛 Bug Fixes
