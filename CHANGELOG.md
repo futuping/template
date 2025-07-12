@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ---
 ## [unreleased]
 
+### 🚀 Features
+
+- enhance changelog and CI/CD workflow configuration - ([b1b9070]($REPO/commit/b1b907082047d2304a57dc0908f9f088e28cad3c)) - Maverick Tuping Fu
+
 ### ⚙️ Miscellaneous Tasks
 
 - add markdownlint ignore file for CHANGELOG.md - ([29d8ba4]($REPO/commit/29d8ba4772cc70db9da6d228de9de585bfa24eeb)) - Maverick Tuping Fu
