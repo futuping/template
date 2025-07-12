@@ -187,6 +187,16 @@ repos:
         files: \.rs$
         pass_filenames: false
 
+      # 自动生成/更新 CHANGELOG.md
+      - id: git-cliff-changelog
+        name: "📝 生成 CHANGELOG.md"
+        description: "使用 git-cliff 自动生成/更新 CHANGELOG.md"
+        entry: bash -c 'git cliff -o CHANGELOG.md'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
       # 拼写检查
       - id: typos
         name: "🔍 拼写 · 检查代码和文档中的拼写错误"

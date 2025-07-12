@@ -1,7 +1,36 @@
-<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [0.4.1] - 2025-07-12
+
+### 🐛 Bug Fixes
+
+- 修复 GitHub Release 中 changelog 的 Markdown 格式问题
+
+### ⚙️ Miscellaneous Tasks
+
+- 更新版本号到 0.4.0
+- 更新 Cargo.lock 以匹配版本 0.4.0
+- 更新版本号到 0.4.1
+
+## [0.4.0] - 2025-07-11
+
+### 🚀 Features
+
+- 升级到完整的 Rust CI/CD 管道
+
+## [0.3.1] - 2025-07-11
+
+### 🐛 Bug Fixes
+
+- 添加最低支持的 Rust 版本 (MSRV) 配置
+
+## [0.3.0] - 2025-07-11
+
+### 🚜 Refactor
+
+- 重构 CI/CD 工作流配置
 
 ## [0.2.1] - 2025-07-11
 
@@ -17,25 +46,25 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.4] - 2025-07-11
 
-### 🐛 Bug Fixes
+### 💼 Other
 
 - 解决发布文件路径 404 错误
 
 ## [0.1.3] - 2025-07-11
 
-### 🐛 Bug Fixes
+### 💼 Other
 
 - 解决 CodeQL 检查脚本的 undefined 错误
 
 ## [0.1.2] - 2025-07-11
 
-### 🐛 Bug Fixes
+### 💼 Other
 
 - 解决发布资产上传 404 错误
 
 ## [0.1.1] - 2025-07-11
 
-### 🔧 Improvements
+### 💼 Other
 
 - PR 工作流效率提升
 - 解决发布作业 hdiutil 命令找不到的问题
@@ -58,7 +87,7 @@ All notable changes to this project will be documented in this file.
 - .pre-commit-config.yaml and add .secrets.baseline
 - .pre-commit-config.yaml - 修复 gitleaks 和 detect-secrets 配置问题
 
-### 🔧 Improvements
+### 💼 Other
 
 - Change world whit rust in main.rs
 - 简化构建系统并优化 nextest 配置
