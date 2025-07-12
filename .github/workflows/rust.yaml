@@ -156,7 +156,8 @@ jobs:
         run: |
           if [ -f "cliff.toml" ]; then
             cargo install git-cliff --locked
-            git cliff --tag ${{ github.ref_name }} --strip all > RELEASE_NOTES.md
+            # 生成指定标签的 changelog，保留 Markdown 格式
+            git cliff --tag ${{ github.ref_name }} --strip header,footer > RELEASE_NOTES.md
           else
             echo "Release ${{ github.ref_name }}" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
